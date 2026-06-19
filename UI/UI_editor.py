@@ -20,6 +20,10 @@ from core.render.preview_widget import PreviewWidget
 from core.scene import PIECE_MIME_TYPE, WorldView
 from PySide6.QtWidgets import QFileDialog
 
+import io
+import traceback
+from contextlib import redirect_stdout
+
 class PieceListWidget(QListWidget):
 
     def mimeData(self, items):
@@ -130,6 +134,7 @@ class EditorWindow(QMainWindow):
         self.pieces_list.itemClicked.connect(self.on_piece_clicked)
         self.create_right_panel()
         self.create_bottom_panel()
+        self.Output_bootom_panel()
         self.create_preview_panel()
         self.create_menu()
         self.create_statusbar()
@@ -175,19 +180,29 @@ class EditorWindow(QMainWindow):
         menu_windows.addAction(self.toolsDock.toggleViewAction())
         menu_windows.addAction(self.propertiesDock.toggleViewAction())
         menu_windows.addAction(self.scriptDock.toggleViewAction())
+        menu_windows.addAction(self.outputDock.toggleViewAction())
+
 
         menu.addMenu("Ajuda")
 
     # -------------------------------------------------
 
     def run_project(self):
-
         placed_pieces = self.world.placed_pieces()
+        self.execution_window = ExecutionWindow(
+            placed_pieces,
+            self
+        )
 
-        self.execution_window = ExecutionWindow(placed_pieces, self)
         self.execution_window.show()
 
-        self.statusBar().showMessage("Projeto em execucao")
+        project_folder = Path(self.project_path).parent
+        script_folder = project_folder / "Scripts"
+        if script_folder.exists():
+            print("Arquivos:")
+            for f in script_folder.iterdir():
+                self.execute_script(f)
+        self.statusBar().showMessage("Projeto em execução")
 
     # -------------------------------------------------
 
@@ -258,6 +273,17 @@ class EditorWindow(QMainWindow):
             Qt.BottomDockWidgetArea,
             self.scriptDock
         )
+
+    def Output_bootom_panel(self):
+
+        self.outputDock = QDockWidget("Output", self)
+        self.outputEditor = QTextEdit()
+        self.outputDock.setWidget(self.outputEditor)
+        self.addDockWidget(
+            Qt.BottomDockWidgetArea,
+            self.outputDock
+        )
+
     def new_project(self):
 
         self.scriptEditor.clear()
@@ -439,3 +465,34 @@ class EditorWindow(QMainWindow):
         }
 
         """)
+    def write_output(self, text):
+        self.outputEditor.append(text)
+
+    def clear_output(self):
+
+        self.outputEditor.clear()
+
+    def execute_script(self, filename):
+        self.clear_output()
+        try:
+
+            namespace = {}
+
+            with open(filename, "r", encoding="utf-8") as file:
+                source = file.read()
+
+            output = io.StringIO()
+
+            with redirect_stdout(output):
+                exec(source, namespace)
+
+            text = output.getvalue()
+
+            if text:
+                self.write_output(text)
+
+            self.statusBar().showMessage("Script executado")
+
+        except Exception:
+
+            self.write_output(traceback.format_exc())
