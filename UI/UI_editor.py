@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QMimeData
 from PySide6.QtWidgets import (
     QDockWidget,
     QListWidget,
@@ -13,7 +13,21 @@ from PySide6.QtWidgets import (
 
 from core.package import Package
 from core.render.preview_widget import PreviewWidget
-from core.scene import WorldView
+from core.scene import PIECE_MIME_TYPE, WorldView
+
+
+class PieceListWidget(QListWidget):
+
+    def mimeData(self, items):
+
+        mime_data = QMimeData()
+
+        if items:
+            piece_name = items[0].text()
+            mime_data.setText(piece_name)
+            mime_data.setData(PIECE_MIME_TYPE, piece_name.encode("utf-8"))
+
+        return mime_data
 
 
 class EditorWindow(QMainWindow):
@@ -78,6 +92,7 @@ class EditorWindow(QMainWindow):
     def create_center(self):
 
         self.world = WorldView()
+        self.world.set_package(self.package)
 
         self.setCentralWidget(self.world)
 
@@ -87,7 +102,10 @@ class EditorWindow(QMainWindow):
 
         self.toolsDock = QDockWidget("Pecas", self)
 
-        self.pieces_list = QListWidget()
+        self.pieces_list = PieceListWidget()
+        self.pieces_list.setDragEnabled(True)
+        self.pieces_list.setDefaultDropAction(Qt.CopyAction)
+        self.pieces_list.setSelectionMode(QListWidget.SingleSelection)
 
         self.load_default_pieces()
 
