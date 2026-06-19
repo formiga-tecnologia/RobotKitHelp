@@ -186,6 +186,25 @@ class WorldView(QGraphicsView):
 
     # --------------------------------------------------------
 
+    def placed_pieces(self):
+
+        pieces = []
+
+        for item in self.scene.items():
+
+            if isinstance(item, PieceGraphicsItem):
+                pieces.append(
+                    {
+                        "piece": item.piece,
+                        "x": item.pos().x(),
+                        "y": item.pos().y()
+                    }
+                )
+
+        return pieces
+
+    # --------------------------------------------------------
+
     def dragEnterEvent(self, event):
 
         if self._has_piece(event.mimeData()):

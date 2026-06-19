@@ -3,6 +3,9 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QMimeData
 from PySide6.QtWidgets import (
     QDockWidget,
+    QGraphicsRectItem,
+    QGraphicsScene,
+    QGraphicsView,
     QListWidget,
     QMainWindow,
     QStatusBar,
@@ -10,8 +13,9 @@ from PySide6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
 )
-
+from PySide6.QtGui import QAction, QColor, QBrush, QPainter, QPen
 from core.package import Package
+from core.piece import RectElement
 from core.render.preview_widget import PreviewWidget
 from core.scene import PIECE_MIME_TYPE, WorldView
 
@@ -28,6 +32,71 @@ class PieceListWidget(QListWidget):
             mime_data.setData(PIECE_MIME_TYPE, piece_name.encode("utf-8"))
 
         return mime_data
+
+
+class ExecutionWindow(QMainWindow):
+
+    def __init__(self, placed_pieces, parent=None):
+
+        super().__init__(parent)
+
+        self.setWindowTitle("RoboKitHelp - Execucao")
+        self.resize(900, 600)
+
+        self.scene = QGraphicsScene(self)
+        self.scene.setBackgroundBrush(QColor("#d8d8d8"))
+
+        self.view = QGraphicsView(self.scene)
+        self.view.setRenderHint(QPainter.Antialiasing)
+        self.view.setFrameShape(QGraphicsView.NoFrame)
+
+        self.setCentralWidget(self.view)
+
+        self.render_pieces(placed_pieces)
+
+    # -------------------------------------------------
+
+    def render_pieces(self, placed_pieces):
+
+        self.scene.clear()
+
+        for placed in placed_pieces:
+
+            piece = placed["piece"]
+            base_x = placed["x"]
+            base_y = placed["y"]
+
+            for element in piece:
+
+                if isinstance(element, RectElement):
+
+                    rect = QGraphicsRectItem(
+                        base_x + element.x,
+                        base_y + element.y,
+                        element.width,
+                        element.height
+                    )
+
+                    rect.setBrush(QBrush(QColor(element.fill)))
+                    rect.setPen(QPen(QColor(element.border), 1))
+
+                    self.scene.addItem(rect)
+
+        items_rect = self.scene.itemsBoundingRect()
+
+        if items_rect.isValid() and not items_rect.isNull():
+            margin = 80
+            self.scene.setSceneRect(
+                items_rect.adjusted(
+                    -margin,
+                    -margin,
+                    margin,
+                    margin
+                )
+            )
+            self.view.fitInView(items_rect.adjusted(-40, -40, 40, 40), Qt.KeepAspectRatio)
+        else:
+            self.scene.setSceneRect(0, 0, 900, 600)
 
 
 class EditorWindow(QMainWindow):
@@ -77,7 +146,11 @@ class EditorWindow(QMainWindow):
         menu.addMenu("Editar")
         menu.addMenu("Exibir")
         menu.addMenu("Projeto")
-        menu.addMenu("Executar")
+
+        run_menu = menu.addMenu("Executar")
+        action_run = QAction("Executar", self)
+        action_run.triggered.connect(self.run_project)
+        run_menu.addAction(action_run)
 
         menu_windows = menu.addMenu("Janelas")
 
@@ -86,6 +159,17 @@ class EditorWindow(QMainWindow):
         menu_windows.addAction(self.scriptDock.toggleViewAction())
 
         menu.addMenu("Ajuda")
+
+    # -------------------------------------------------
+
+    def run_project(self):
+
+        placed_pieces = self.world.placed_pieces()
+
+        self.execution_window = ExecutionWindow(placed_pieces, self)
+        self.execution_window.show()
+
+        self.statusBar().showMessage("Projeto em execucao")
 
     # -------------------------------------------------
 
