@@ -10,14 +10,18 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from pathlib import Path
-
+from core.render.preview_widget import PreviewWidget
+from core.package import Package
 from core.scene import WorldView
 
 class EditorWindow(QMainWindow):
 
     def __init__(self, project_path=None):
         super().__init__()
-        from pathlib import Path
+
+        self.package = Package()
+        self.package.load(Path("assets") / "pieces")
+        
 
         self.project_path = project_path
 
@@ -39,8 +43,10 @@ class EditorWindow(QMainWindow):
         # Ordem correta
         self.create_center()
         self.create_left_panel()
+        self.pieces_list.itemClicked.connect(self.on_piece_clicked)
         self.create_right_panel()
         self.create_bottom_panel()
+        self.create_preview_panel()
         self.create_menu()
         self.create_statusbar()
 
@@ -140,6 +146,43 @@ class EditorWindow(QMainWindow):
         status.showMessage("Pronto")
 
         self.setStatusBar(status)
+
+    # -------------------------------------------------
+    # PREVIEW 
+    # -------------------------------------------------
+    def on_piece_clicked(self, item):
+        from core.piece import Piece, RectElement
+
+        piece = Piece(name=item.text())
+
+        piece.add_rect(0, 0, 40, 40, "#888888")
+
+        piece.add_rect(10, 10, 6, 6, "#000000")
+
+        piece.add_rect(24, 10, 6, 6, "#000000")
+
+        self.previewWidget.set_piece(piece)
+        self.previewWidget.update()
+
+
+    def create_preview_panel(self):
+
+        self.previewDock = QDockWidget("Piece Preview", self)
+
+        self.previewWidget = PreviewWidget()
+
+        self.previewDock.setWidget(self.previewWidget)
+
+        self.addDockWidget(
+            Qt.BottomDockWidgetArea,
+            self.previewDock
+        )
+
+        # deixa tipo aba com script
+        self.tabifyDockWidget(
+            self.scriptDock,
+            self.previewDock
+        )
 
     # -------------------------------------------------
     def load_default_pieces(self):
