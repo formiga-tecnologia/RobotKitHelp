@@ -1,0 +1,46 @@
+PIECE
+
+NAME box paft
+
+RECT
+
+SIZE 20 20
+
+FILL #ff6c6c
+
+BORDER #b50e0e
+
+END
+
+RECT
+
+POS 4 4
+
+SIZE 15 15
+
+FILL #ffa6a6
+
+END
+
+RECT
+
+POS 15 15
+
+SIZE 6 6
+
+FILL #904b4b
+
+END
+
+
+RECT
+
+POS 2 2
+
+SIZE 6 6
+
+FILL #904b4b
+
+END
+
+END

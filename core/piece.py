@@ -72,6 +72,8 @@ class Piece:
     name: str = "Unnamed"
 
     elements: list = field(default_factory=list)
+    declared_width: int | None = None
+    declared_height: int | None = None
 
     # -----------------------------------------------------
 
@@ -115,6 +117,9 @@ class Piece:
     @property
     def width(self):
 
+        if self.declared_width is not None:
+            return self.declared_width
+
         if not self.elements:
             return 0
 
@@ -135,6 +140,9 @@ class Piece:
 
     @property
     def height(self):
+
+        if self.declared_height is not None:
+            return self.declared_height
 
         if not self.elements:
             return 0

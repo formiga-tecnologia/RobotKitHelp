@@ -1,18 +1,20 @@
+from pathlib import Path
+
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QMainWindow,
     QDockWidget,
-    QTextEdit,
     QListWidget,
+    QMainWindow,
+    QStatusBar,
+    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
-    QLabel,
-    QStatusBar
 )
-from PySide6.QtCore import Qt
-from pathlib import Path
-from core.render.preview_widget import PreviewWidget
+
 from core.package import Package
+from core.render.preview_widget import PreviewWidget
 from core.scene import WorldView
+
 
 class EditorWindow(QMainWindow):
 
@@ -21,7 +23,6 @@ class EditorWindow(QMainWindow):
 
         self.package = Package()
         self.package.load(Path("assets") / "pieces")
-        
 
         self.project_path = project_path
 
@@ -79,11 +80,12 @@ class EditorWindow(QMainWindow):
         self.world = WorldView()
 
         self.setCentralWidget(self.world)
+
     # -------------------------------------------------
 
     def create_left_panel(self):
 
-        self.toolsDock = QDockWidget("Peças", self)
+        self.toolsDock = QDockWidget("Pecas", self)
 
         self.pieces_list = QListWidget()
 
@@ -102,16 +104,16 @@ class EditorWindow(QMainWindow):
 
         self.propertiesDock = QDockWidget("Propriedades", self)
 
-        tree = QTreeWidget()
+        self.properties_tree = QTreeWidget()
 
-        tree.setHeaderLabels(["Propriedade", "Valor"])
+        self.properties_tree.setHeaderLabels(["Propriedade", "Valor"])
 
-        QTreeWidgetItem(tree, ["Nome", "Robot"])
-        QTreeWidgetItem(tree, ["Posição", "(0,0)"])
-        QTreeWidgetItem(tree, ["Rotação", "0"])
-        QTreeWidgetItem(tree, ["Escala", "1"])
+        self.prop_name = QTreeWidgetItem(self.properties_tree, ["Nome", "-"])
+        self.prop_width = QTreeWidgetItem(self.properties_tree, ["Largura", "-"])
+        self.prop_height = QTreeWidgetItem(self.properties_tree, ["Altura", "-"])
+        self.prop_quantity = QTreeWidgetItem(self.properties_tree, ["Quantidade", "-"])
 
-        self.propertiesDock.setWidget(tree)
+        self.propertiesDock.setWidget(self.properties_tree)
 
         self.addDockWidget(
             Qt.RightDockWidgetArea,
@@ -127,7 +129,7 @@ class EditorWindow(QMainWindow):
         editor = QTextEdit()
 
         editor.setPlaceholderText(
-            "# Escreva a lógica do seu robô..."
+            "# Escreva a logica do seu robo..."
         )
 
         self.scriptDock.setWidget(editor)
@@ -148,7 +150,7 @@ class EditorWindow(QMainWindow):
         self.setStatusBar(status)
 
     # -------------------------------------------------
-    # PREVIEW 
+    # PREVIEW
     # -------------------------------------------------
     def on_piece_clicked(self, item):
 
@@ -156,15 +158,21 @@ class EditorWindow(QMainWindow):
 
         piece = self.package.get(name)
 
-        print("\n==== PIECE DEBUG ====")
-        print("NAME:", piece.name)
-        print("WIDTH:", piece.width)
-        print("HEIGHT:", piece.height)
-        print("ELEMENTS:", len(list(piece)))
+        if piece is None:
+            self.previewWidget.set_piece(None)
+            self.statusBar().showMessage("Peca nao encontrada")
+            return
 
-        for e in piece:
-            print("RECT:", e.x, e.y, e.width, e.height, e.fill)
+        self.previewWidget.set_piece(piece)
+        self.update_piece_properties(piece)
+        self.statusBar().showMessage(f"Peca selecionada: {piece.name}")
 
+    def update_piece_properties(self, piece):
+
+        self.prop_name.setText(1, piece.name)
+        self.prop_width.setText(1, str(piece.width))
+        self.prop_height.setText(1, str(piece.height))
+        self.prop_quantity.setText(1, str(len(piece)))
 
     def create_preview_panel(self):
 
@@ -200,7 +208,7 @@ class EditorWindow(QMainWindow):
 
         if self.pieces_list.count() == 0:
 
-            self.pieces_list.addItem("(Nenhuma peça encontrada)")
+            self.pieces_list.addItem("(Nenhuma peca encontrada)")
 
     def set_dark_theme(self):
 

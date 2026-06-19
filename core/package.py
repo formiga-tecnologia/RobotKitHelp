@@ -20,7 +20,7 @@ class Package:
 
             piece = self.parser.parse(text)
 
-            if piece:
+            if piece is not None:
                 self.pieces[file.stem] = piece
 
     def get(self, name):

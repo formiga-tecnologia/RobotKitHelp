@@ -130,7 +130,7 @@ class PieceLoader:
                             y=current_rect["y"],
                             width=current_rect["width"],
                             height=current_rect["height"],
-                            color=current_rect["color"]
+                            fill=current_rect["color"]
 
                         )
 
