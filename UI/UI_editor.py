@@ -18,7 +18,7 @@ from core.package import Package
 from core.piece import RectElement
 from core.render.preview_widget import PreviewWidget
 from core.scene import PIECE_MIME_TYPE, WorldView
-
+from PySide6.QtWidgets import QFileDialog
 
 class PieceListWidget(QListWidget):
 
@@ -154,6 +154,24 @@ class EditorWindow(QMainWindow):
 
         menu_windows = menu.addMenu("Janelas")
 
+        Arquivo_menu =  menu.addMenu("Arquivo")
+
+        action_new = QAction("Novo Script", self)
+        action_new.triggered.connect(self.new_project)
+        Arquivo_menu.addAction(action_new)
+
+        action_open = QAction("Abrir Script", self)
+        action_open.triggered.connect(self.open_project)
+        Arquivo_menu.addAction(action_open)
+
+        action_save = QAction("Salvar Script", self)
+        action_save.triggered.connect(self.save_project)
+        Arquivo_menu.addAction(action_save)
+
+        action_exit = QAction("Sair", self)
+        action_exit.triggered.connect(self.close)
+        Arquivo_menu.addAction(action_exit)
+
         menu_windows.addAction(self.toolsDock.toggleViewAction())
         menu_windows.addAction(self.propertiesDock.toggleViewAction())
         menu_windows.addAction(self.scriptDock.toggleViewAction())
@@ -228,19 +246,74 @@ class EditorWindow(QMainWindow):
 
         self.scriptDock = QDockWidget("Script", self)
 
-        editor = QTextEdit()
+        self.scriptEditor = QTextEdit()
 
-        editor.setPlaceholderText(
+        self.scriptEditor.setPlaceholderText(
             "# Escreva a logica do seu robo..."
         )
 
-        self.scriptDock.setWidget(editor)
+        self.scriptDock.setWidget(self.scriptEditor)
 
         self.addDockWidget(
             Qt.BottomDockWidgetArea,
             self.scriptDock
         )
+    def new_project(self):
 
+        self.scriptEditor.clear()
+
+        self.statusBar().showMessage("Novo script criado")
+
+    def open_project(self):
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Abrir Script",
+            "",
+            "Python (*.py)"
+        )
+
+        if not filename:
+            return
+
+        try:
+
+            with open(filename, "r", encoding="utf-8") as file:
+
+                self.scriptEditor.setPlainText(file.read())
+
+            self.statusBar().showMessage(f"Script carregado: {Path(filename).name}")
+
+        except Exception as e:
+
+            self.statusBar().showMessage(str(e))
+
+
+    def save_project(self):
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Salvar Script",
+            "script.py",
+            "Python (*.py)"
+        )
+
+        if not filename:
+            return
+
+        if not filename.endswith(".py"):
+            filename += ".py"
+
+        try:
+
+            with open(filename, "w", encoding="utf-8") as file:
+
+                file.write(self.scriptEditor.toPlainText())
+
+            self.statusBar().showMessage(f"Script salvo: {Path(filename).name}")
+
+        except Exception as e:
+            self.statusBar().showMessage(str(e))
     # -------------------------------------------------
 
     def create_statusbar(self):
