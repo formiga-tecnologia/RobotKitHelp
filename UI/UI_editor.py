@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
     QStatusBar
 )
 from PySide6.QtCore import Qt
+from pathlib import Path
 
+from core.scene import WorldView
 
 class EditorWindow(QMainWindow):
 
@@ -68,36 +70,20 @@ class EditorWindow(QMainWindow):
 
     def create_center(self):
 
-        world = QLabel("MUNDO")
-        world.setAlignment(Qt.AlignCenter)
+        self.world = WorldView()
 
-        world.setStyleSheet("""
-            background:#2f3136;
-            color:white;
-            font-size:24px;
-            border:1px solid #555;
-        """)
-
-        self.setCentralWidget(world)
-
+        self.setCentralWidget(self.world)
     # -------------------------------------------------
 
     def create_left_panel(self):
 
-        self.toolsDock = QDockWidget("Ferramentas", self)
+        self.toolsDock = QDockWidget("Peças", self)
 
-        tools = QListWidget()
+        self.pieces_list = QListWidget()
 
-        tools.addItems([
-            "Selecionar",
-            "Mover",
-            "Rotacionar",
-            "Escalar",
-            "Package",
-            "Objetos"
-        ])
+        self.load_default_pieces()
 
-        self.toolsDock.setWidget(tools)
+        self.toolsDock.setWidget(self.pieces_list)
 
         self.addDockWidget(
             Qt.LeftDockWidgetArea,
@@ -156,6 +142,21 @@ class EditorWindow(QMainWindow):
         self.setStatusBar(status)
 
     # -------------------------------------------------
+    def load_default_pieces(self):
+
+        self.pieces_list.clear()
+
+        pieces_folder = Path("assets") / "pieces"
+
+        pieces_folder.mkdir(parents=True, exist_ok=True)
+
+        for piece in sorted(pieces_folder.glob("*.rkp")):
+
+            self.pieces_list.addItem(piece.stem)
+
+        if self.pieces_list.count() == 0:
+
+            self.pieces_list.addItem("(Nenhuma peça encontrada)")
 
     def set_dark_theme(self):
 
