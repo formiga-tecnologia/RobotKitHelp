@@ -151,18 +151,19 @@ class EditorWindow(QMainWindow):
     # PREVIEW 
     # -------------------------------------------------
     def on_piece_clicked(self, item):
-        from core.piece import Piece, RectElement
 
-        piece = Piece(name=item.text())
+        name = item.text()
 
-        piece.add_rect(0, 0, 40, 40, "#888888")
+        piece = self.package.get(name)
 
-        piece.add_rect(10, 10, 6, 6, "#000000")
+        print("\n==== PIECE DEBUG ====")
+        print("NAME:", piece.name)
+        print("WIDTH:", piece.width)
+        print("HEIGHT:", piece.height)
+        print("ELEMENTS:", len(list(piece)))
 
-        piece.add_rect(24, 10, 6, 6, "#000000")
-
-        self.previewWidget.set_piece(piece)
-        self.previewWidget.update()
+        for e in piece:
+            print("RECT:", e.x, e.y, e.width, e.height, e.fill)
 
 
     def create_preview_panel(self):

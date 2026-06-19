@@ -12,42 +12,41 @@ class RKPParser:
 
             line = raw.strip()
 
-            if not line or line.startswith("#"):
+            if not line:
                 continue
 
             tokens = line.split()
 
-            if tokens[0] == "PIECE":
+            cmd = tokens[0]
+
+            if cmd == "PIECE":
                 piece = Piece()
 
-            elif tokens[0] == "NAME":
+            elif cmd == "NAME":
                 piece.name = " ".join(tokens[1:])
 
-            elif tokens[0] == "SIZE":
+            elif cmd == "SIZE":
                 piece._width = int(tokens[1])
                 piece._height = int(tokens[2])
 
-            elif tokens[0] == "RECT":
-                current = RectElement()
+            elif cmd == "RECT":
+                current = RectElement()   # 🔥 NOVA instância SEMPRE
 
-            elif tokens[0] == "POS":
+            elif cmd == "POS":
                 current.x = int(tokens[1])
                 current.y = int(tokens[2])
 
-            elif tokens[0] == "SIZE_RECT":
+            elif cmd == "SIZE_RECT":
                 current.width = int(tokens[1])
                 current.height = int(tokens[2])
 
-            elif tokens[0] == "COLOR":
+            elif cmd == "COLOR":
                 current.fill = tokens[1]
                 current.border = tokens[1]
 
-            elif tokens[0] == "END":
-                if current and piece:
+            elif cmd == "END":
+                if current:
                     piece.add(current)
-                    current = None
-
-            elif tokens[0] == "END_PIECE":
-                break
+                    current = None  # 🔥 MUITO IMPORTANTE
 
         return piece
