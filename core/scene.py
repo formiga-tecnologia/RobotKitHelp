@@ -6,7 +6,8 @@ from PySide6.QtWidgets import (
     QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsSimpleTextItem,
-    QGraphicsView
+    QGraphicsView,
+    QInputDialog
 )
 
 from core.piece import RectElement
@@ -21,11 +22,12 @@ class PieceGraphicsItem(QGraphicsItemGroup):
     LABEL_GAP = 6
     LABEL_PADDING = 8
 
-    def __init__(self, piece):
+    def __init__(self, piece, label=None):
 
         super().__init__()
 
         self.piece = piece
+        self.label = label or piece.name
 
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
@@ -38,7 +40,7 @@ class PieceGraphicsItem(QGraphicsItemGroup):
 
     def _build_label(self):
 
-        text = QGraphicsSimpleTextItem(self.piece.name)
+        text = QGraphicsSimpleTextItem(self.label)
 
         font = QFont()
         font.setPointSize(8)
@@ -89,6 +91,62 @@ class PieceGraphicsItem(QGraphicsItemGroup):
                 rect.setPen(QPen(QColor(element.border), 1))
 
                 self.addToGroup(rect)
+
+    # --------------------------------------------------------
+
+    def mouseDoubleClickEvent(self, event):
+
+        label, accepted = QInputDialog.getText(
+            None,
+            "Renomear robo",
+            "Nome do robo:",
+            text=self.label
+        )
+
+        label = label.strip()
+
+        if accepted and label:
+            self.label = self._available_label(label)
+            self._rebuild()
+
+        super().mouseDoubleClickEvent(event)
+
+    # --------------------------------------------------------
+
+    def _rebuild(self):
+
+        for child in list(self.childItems()):
+            self.removeFromGroup(child)
+            if child.scene() is not None:
+                child.scene().removeItem(child)
+
+        self._build_label()
+        self._build_piece()
+
+    # --------------------------------------------------------
+
+    def _available_label(self, label):
+
+        scene = self.scene()
+
+        if scene is None:
+            return label
+
+        existing = {
+            item.label
+            for item in scene.items()
+            if isinstance(item, PieceGraphicsItem) and item is not self
+        }
+
+        if label not in existing:
+            return label
+
+        index = 2
+
+        while f"{label} {index}" in existing:
+            index += 1
+
+        return f"{label} {index}"
 
 
 class WorldScene(QGraphicsScene):
@@ -177,6 +235,7 @@ class WorldView(QGraphicsView):
         self._middle_pressed = False
         self._last_pos = QPoint()
         self.package = None
+        self._label_counts = {}
 
     # --------------------------------------------------------
 
@@ -196,6 +255,7 @@ class WorldView(QGraphicsView):
                 pieces.append(
                     {
                         "piece": item.piece,
+                        "label": item.label,
                         "x": item.pos().x(),
                         "y": item.pos().y()
                     }
@@ -242,7 +302,7 @@ class WorldView(QGraphicsView):
         scene_pos = self.mapToScene(event.position().toPoint())
         snapped_pos = self._snap_to_grid(scene_pos)
 
-        item = PieceGraphicsItem(piece)
+        item = PieceGraphicsItem(piece, self._next_label(piece.name))
         item.setPos(snapped_pos)
 
         self.scene.addItem(item)
@@ -280,6 +340,18 @@ class WorldView(QGraphicsView):
         y = round(pos.y() / grid) * grid
 
         return QPoint(x, y)
+
+    # --------------------------------------------------------
+
+    def _next_label(self, piece_name):
+
+        count = self._label_counts.get(piece_name, 0) + 1
+        self._label_counts[piece_name] = count
+
+        if count == 1:
+            return piece_name
+
+        return f"{piece_name} {count}"
 
     # --------------------------------------------------------
 

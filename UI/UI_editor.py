@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QMimeData
+from PySide6.QtCore import Qt, QMimeData, QPointF, QEasingCurve, QVariantAnimation
 from PySide6.QtWidgets import (
     QDockWidget,
+    QGraphicsItemGroup,
     QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsView,
@@ -17,7 +18,7 @@ from PySide6.QtGui import QAction, QColor, QBrush, QPainter, QPen
 from core.package import Package
 from core.piece import RectElement
 from core.render.preview_widget import PreviewWidget
-from core.scene import PIECE_MIME_TYPE, WorldView
+from core.scene import PIECE_MIME_TYPE, WorldScene, WorldView
 from PySide6.QtWidgets import QFileDialog
 
 import io
@@ -40,6 +41,17 @@ class PieceListWidget(QListWidget):
 
 class ExecutionWindow(QMainWindow):
 
+    DIRECTIONS = {
+        "left": (-1, 0),
+        "right": (1, 0),
+        "up": (0, -1),
+        "down": (0, 1),
+        "esquerda": (-1, 0),
+        "direita": (1, 0),
+        "cima": (0, -1),
+        "baixo": (0, 1),
+    }
+
     def __init__(self, placed_pieces, parent=None):
 
         super().__init__(parent)
@@ -56,6 +68,8 @@ class ExecutionWindow(QMainWindow):
 
         self.setCentralWidget(self.view)
 
+        self.robot_items = {}
+        self._move_animations = []
         self.render_pieces(placed_pieces)
 
     # -------------------------------------------------
@@ -67,16 +81,19 @@ class ExecutionWindow(QMainWindow):
         for placed in placed_pieces:
 
             piece = placed["piece"]
+            label = placed.get("label", piece.name)
             base_x = placed["x"]
             base_y = placed["y"]
+            group = QGraphicsItemGroup()
+            group.setPos(base_x, base_y)
 
             for element in piece:
 
                 if isinstance(element, RectElement):
 
                     rect = QGraphicsRectItem(
-                        base_x + element.x,
-                        base_y + element.y,
+                        element.x,
+                        element.y,
                         element.width,
                         element.height
                     )
@@ -84,7 +101,11 @@ class ExecutionWindow(QMainWindow):
                     rect.setBrush(QBrush(QColor(element.fill)))
                     rect.setPen(QPen(QColor(element.border), 1))
 
-                    self.scene.addItem(rect)
+                    group.addToGroup(rect)
+
+            group.setData(0, label)
+            self.scene.addItem(group)
+            self.robot_items[label] = group
 
         items_rect = self.scene.itemsBoundingRect()
 
@@ -101,6 +122,74 @@ class ExecutionWindow(QMainWindow):
             self.view.fitInView(items_rect.adjusted(-40, -40, 40, 40), Qt.KeepAspectRatio)
         else:
             self.scene.setSceneRect(0, 0, 900, 600)
+
+    # -------------------------------------------------
+
+    def move_robot(self, robot_name, direction, quantity):
+
+        robot = self.robot_items.get(robot_name)
+
+        if robot is None:
+            return False
+
+        direction = str(direction).lower()
+        if direction not in self.DIRECTIONS:
+            return False
+
+        dx, dy = self.DIRECTIONS[direction]
+        steps = int(quantity)
+
+        if steps <= 0:
+            return True
+
+        state = {"steps": steps, "animation": None}
+        self._move_animations.append(state)
+
+        def animate_next_step():
+            if state["steps"] <= 0:
+                self._move_animations.remove(state)
+                return
+
+            start = robot.pos()
+            end = QPointF(
+                start.x() + dx * WorldScene.GRID_SIZE,
+                start.y() + dy * WorldScene.GRID_SIZE
+            )
+
+            animation = QVariantAnimation(self)
+            animation.setDuration(100)
+            animation.setStartValue(start)
+            animation.setEndValue(end)
+            animation.setEasingCurve(QEasingCurve.InOutQuad)
+
+            def update_position(value):
+                robot.setPos(value)
+                self._expand_scene_to_items()
+
+            def finish_step():
+                state["steps"] -= 1
+                animation.deleteLater()
+                animate_next_step()
+
+            animation.valueChanged.connect(update_position)
+            animation.finished.connect(finish_step)
+            state["animation"] = animation
+            animation.start()
+
+        animate_next_step()
+
+        return True
+
+    # -------------------------------------------------
+
+    def _expand_scene_to_items(self):
+
+        items_rect = self.scene.itemsBoundingRect()
+
+        if items_rect.isValid() and not items_rect.isNull():
+            self.scene.setSceneRect(
+                items_rect.adjusted(-160, -160, 160, 160)
+            )
 
 
 class EditorWindow(QMainWindow):
@@ -196,12 +285,17 @@ class EditorWindow(QMainWindow):
 
         self.execution_window.show()
 
-        project_folder = Path(self.project_path).parent
-        script_folder = project_folder / "Scripts"
-        if script_folder.exists():
-            print("Arquivos:")
-            for f in script_folder.iterdir():
-                self.execute_script(f)
+        current_script = self.scriptEditor.toPlainText().strip()
+        if current_script:
+            self.execute_script_source(current_script, "Editor")
+
+        if self.project_path:
+            project_folder = Path(self.project_path).parent
+            script_folder = project_folder / "Scripts"
+            if script_folder.exists():
+                print("Arquivos:")
+                for f in script_folder.iterdir():
+                    self.execute_script(f)
         self.statusBar().showMessage("Projeto em execução")
 
     # -------------------------------------------------
@@ -473,14 +567,23 @@ class EditorWindow(QMainWindow):
         self.outputEditor.clear()
 
     def execute_script(self, filename):
-        self.clear_output()
         try:
-
-            namespace = {}
 
             with open(filename, "r", encoding="utf-8") as file:
                 source = file.read()
 
+            self.execute_script_source(source, Path(filename).name)
+
+        except Exception:
+
+            self.write_output(traceback.format_exc())
+
+    def execute_script_source(self, source, script_name="Script"):
+        self.clear_output()
+
+        try:
+
+            namespace = {}
             output = io.StringIO()
 
             with redirect_stdout(output):
@@ -490,9 +593,66 @@ class EditorWindow(QMainWindow):
 
             if text:
                 self.write_output(text)
+            
+            if "world_changes" in namespace:
+                changes = namespace["world_changes"]()
+                self.apply_world_changes(changes)
 
-            self.statusBar().showMessage("Script executado")
+            if "move_robot" in namespace:
+                changes = namespace["move_robot"]()
+                self.apply_robot_changes(changes)
+
+            self.statusBar().showMessage(f"Script executado: {script_name}")
 
         except Exception:
 
             self.write_output(traceback.format_exc())
+
+    def apply_world_changes(self, changes):
+        if "background" in changes:
+            self.execution_window.scene.setBackgroundBrush(
+                QColor(changes["background"])
+            )
+
+    def apply_robot_changes(self, changes):
+        if isinstance(changes, dict):
+            changes = [changes]
+
+        if not isinstance(changes, list):
+            self.write_output("move_robot deve retornar um dicionario ou uma lista de dicionarios.")
+            return
+
+        for change in changes:
+            if not isinstance(change, dict):
+                self.write_output("Comando de movimento ignorado: formato invalido.")
+                continue
+
+            robot_name = (
+                change.get("robot_name") or
+                change.get("robot") or
+                change.get("name")
+            )
+            direction = change.get("dir") or change.get("direction")
+            quantity = (
+                change.get("qtd") or
+                change.get("quantity") or
+                change.get("steps") or
+                1
+            )
+
+            if not robot_name or not direction:
+                self.write_output("Comando de movimento ignorado: informe robot_name e dir.")
+                continue
+
+            try:
+                moved = self.execution_window.move_robot(
+                    robot_name,
+                    direction,
+                    quantity
+                )
+            except (TypeError, ValueError):
+                self.write_output(f"Comando de movimento invalido para '{robot_name}'.")
+                continue
+
+            if not moved:
+                self.write_output(f"Robo '{robot_name}' nao encontrado ou direcao invalida.")
