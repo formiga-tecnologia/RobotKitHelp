@@ -571,7 +571,7 @@ class EditorWindow(QMainWindow):
             self.write_output(traceback.format_exc())
 
     def execute_script_source(self, source, script_name="Script"):
-        self.clear_output()
+        #self.clear_output()
 
         try:
 
