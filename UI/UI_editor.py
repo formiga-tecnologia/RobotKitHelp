@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QMimeData, QPointF, QEasingCurve, QVariantAnimation
+from PySide6.QtCore import Qt, QMimeData, QPointF, QEasingCurve, QTimer, QVariantAnimation
 from PySide6.QtWidgets import (
     QDockWidget,
     QGraphicsItemGroup,
@@ -64,7 +64,9 @@ class ExecutionWindow(QMainWindow):
 
         self.view = QGraphicsView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing)
+        self.view.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.view.setFrameShape(QGraphicsView.NoFrame)
+        self.view.setAlignment(Qt.AlignCenter)
 
         self.setCentralWidget(self.view)
 
@@ -77,6 +79,7 @@ class ExecutionWindow(QMainWindow):
     def render_pieces(self, placed_pieces):
 
         self.scene.clear()
+        self.robot_items.clear()
 
         for placed in placed_pieces:
 
@@ -85,7 +88,7 @@ class ExecutionWindow(QMainWindow):
             base_x = placed["x"]
             base_y = placed["y"]
             group = QGraphicsItemGroup()
-            group.setPos(base_x, base_y)
+            self.scene.addItem(group)
 
             for element in piece:
 
@@ -95,31 +98,23 @@ class ExecutionWindow(QMainWindow):
                         element.x,
                         element.y,
                         element.width,
-                        element.height
+                        element.height,
+                        group
                     )
 
                     rect.setBrush(QBrush(QColor(element.fill)))
                     rect.setPen(QPen(QColor(element.border), 1))
 
-                    group.addToGroup(rect)
-
+            group.setPos(base_x, base_y)
             group.setData(0, label)
-            self.scene.addItem(group)
             self.robot_items[label] = group
 
         items_rect = self.scene.itemsBoundingRect()
 
         if items_rect.isValid() and not items_rect.isNull():
-            margin = 80
-            self.scene.setSceneRect(
-                items_rect.adjusted(
-                    -margin,
-                    -margin,
-                    margin,
-                    margin
-                )
-            )
-            self.view.fitInView(items_rect.adjusted(-40, -40, 40, 40), Qt.KeepAspectRatio)
+            self._fit_rect = items_rect.adjusted(-80, -80, 80, 80)
+            self.scene.setSceneRect(self._fit_rect)
+            QTimer.singleShot(0, self.fit_robots_in_view)
         else:
             self.scene.setSceneRect(0, 0, 900, 600)
 
@@ -164,7 +159,6 @@ class ExecutionWindow(QMainWindow):
 
             def update_position(value):
                 robot.setPos(value)
-                self._expand_scene_to_items()
 
             def finish_step():
                 state["steps"] -= 1
@@ -182,14 +176,12 @@ class ExecutionWindow(QMainWindow):
 
     # -------------------------------------------------
 
-    def _expand_scene_to_items(self):
+    def fit_robots_in_view(self):
 
-        items_rect = self.scene.itemsBoundingRect()
+        fit_rect = getattr(self, "_fit_rect", None)
 
-        if items_rect.isValid() and not items_rect.isNull():
-            self.scene.setSceneRect(
-                items_rect.adjusted(-160, -160, 160, 160)
-            )
+        if fit_rect is not None and fit_rect.isValid() and not fit_rect.isNull():
+            self.view.fitInView(fit_rect, Qt.KeepAspectRatio)
 
 
 class EditorWindow(QMainWindow):
